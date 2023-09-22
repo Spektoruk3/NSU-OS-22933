@@ -1,108 +1,123 @@
-#include <algorithm>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <map>
-#include <tuple>
-#include <sstream>
-#include <cmath>
-#include <vector>
-#include <cstdio>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <ucred.h>
+#include <assert.h>
+#include <ulimit.h>
+#include <sys/resource.h>
 
-using namespace std;
+int main(int argc, char *argv[]) {
+    int c;
+    extern char *optarg;
+    extern int optind, optopt;
 
-int i = 0;
+    extern char **environ;
 
-char* getCmdOption(char** begin, char** end, const string& option) {
-    char** itr = find(begin, end, option);
-    if (itr != end && itr + 1 != end) {
-        return *itr;
-    }
-    return 0;
-}
+    pid_t pid, pgid, ppid;
+    ucred_t *cred;
+    uid_t euid, ruid;
+    gid_t egid, rgid;
+    long ulim;
+    char *cwd;
+    struct rlimit core_lim;
 
-bool cmdOptionExists(char** begin, char** end, const string& option) {
-    return find(begin, end, option) != end;
-}
-
-//string words(string str){
-//    char[100] word;
-//    string word;
-//    int j = 0;
-//    while((str[i] >= 'A' && str[i] <= 'Z') || (str[i] <= 'z' && str[i] >= 'a') ||
-//    (str[i] >= '0' && str[i] <= '9') || (str[i] >= 'А' && str[i] <= 'Я') || (str[i] >= 'а' && str[i] <= 'я') ){
-//       word[j] += str[i];
-//       i++;
-//       j++;
-//    }
-//    memcpy(w, word*, j)
-//    return w;
-//}
-
-int main(int argc, char* argv[]) {
-    if (!cmdOptionExists(argv, argv + argc, "input.txt")) {
-        std::cout << "Error, no input file provided";
-        exit(13);
-    }
-    if (!cmdOptionExists(argv, argv + argc, "output.csv")) {
-        std::cout << "Error, no output file provided";
-        exit(13);
-    }
-
-    char* input = getCmdOption(argv, argv + argc, "input.txt");
-
-    char* output = getCmdOption(argv + 1, argv + argc + 1, "output.csv");
-    ifstream in;
-    ofstream out;
-    in.open(input);
-    out.open(output);
-    int count = 0;
-    int counter = 0;
-    string str;
-    //    cout << locale().name();
-    //    std::locale loc("ru-RU");
-    //    std::locale loc("en_US");
-    //    list<string> str;
-    std::map<string, std::tuple<int, double, double>> tst;
-    while (!in.eof()) {
-        getline(in, str);
-        std::stringstream ss{ str };
-        std::string word;
-        while (ss >> word) {
-            vector <char> new_word;
-            for (auto l : word) {
-                if (isalpha(l) || isdigit(l) || l <= 'Я' && l >= 'А' || l <= 'я' && l >= 'а') {
-                    new_word.push_back(l);
+    for (int i = argc - 1; i >= 0; i--) {
+        optind = i;
+        c = getopt(argc, argv, "U:uispdvV:cC:");
+        switch (c) {
+            case 'i':
+                pid = getpid();
+                cred = ucred_get(pid);
+                if (cred == NULL) {
+                    perror("Failed to obtain the user credential");
+                    continue;
                 }
-            }
-            string new_str(new_word.begin(), new_word.end());
-            if (std::get<0>(tst[new_str])) {
-                std::get<0>(tst[new_str])++;
-            }
-            else {
-                tst[new_str] = std::tuple<int, double, double>(1, 0, 0);
-            }
-            count++;
+                euid = ucred_geteuid(cred);
+                ruid = ucred_getruid(cred);
+                egid = ucred_getegid(cred);
+                rgid = ucred_getrgid(cred);
+                printf(
+                    "Effective user id = %d\nReal user id = %d\nEffective groud id = %d\nReal group id = %d\n",
+                    euid, ruid, egid, rgid
+                );
+                ucred_free(cred);
+                break;
+            case 's':
+                pid = getpid();
+                if (setpgid(pid, pid) == -1) {
+                    perror("Failed to set group id");
+                }
+                break;
+            case 'p':
+                pid = getpid();
+                pgid = getpgrp();
+                ppid = getppid();
+                printf(
+                    "Process id = %d\nParent process id = %d\nProcess group id = %d\n",
+                    pid,
+                    ppid,
+                    pgid
+                );
+                break;
+            case 'u':
+                ulim = ulimit(UL_GETFSIZE); 
+                if (ulim == -1) {
+                    perror("Failed to get ulimit"); 
+                    continue;
+                }
+                printf("ulimit = %ld\n", ulim * 512);
+                break;
+            case 'U':
+                ulim = atol(optarg); 
+                if (ulim % 512 != 0) {
+                    fprintf(stderr, "New ulimit value is not divisible by 512\n");
+                    continue;
+                }
+                ulim = ulimit(UL_SETFSIZE, ulim / 512);
+                if (ulim == -1) {
+                    perror("Failed to set ulimit"); 
+                    continue;
+                }
+                break;
+            case 'd':
+                cwd = getcwd(NULL, 256);
+                if (cwd == NULL) {
+                    perror("Failed to get cwd");
+                    continue;
+                }
+                printf("Current working directory: %s\n", cwd);
+                free(cwd);
+                cwd = NULL;
+                break;
+            case 'v':
+                for (int i = 0; environ[i]; i++) {
+                    printf("%s\n", environ[i]);
+                }
+                break;
+            case 'V':
+                if (putenv(optarg) != 0) {
+                    perror("Failed to put env variable");
+                }
+                break;
+            case 'c':
+                if (getrlimit(RLIMIT_CORE, &core_lim) != 0)
+                    perror("Failed to get core limit");
+                printf("Hard core limit = %lu\nSoft core limit = %lu\n", core_lim.rlim_max, core_lim.rlim_cur);
+                break;
+            case 'C':
+                if (getrlimit(RLIMIT_CORE, &core_lim) != 0)
+                    perror("Failed to get core limit");
+                core_lim.rlim_cur = atol(optarg); 
+                if (setrlimit(RLIMIT_CORE, &core_lim) != 0)
+                    perror("Failed to set core limit");
+                break;
+            case ':':
+                fprintf(stderr, "Option -%c requires an operand\n", optopt);
+                break;
+            case '?':
+                fprintf(stderr, "Unrecognized option: -%c\n", optopt);
+                break;
         }
-
     }
-
-    multimap<tuple<int, double, double>, string> res;
-
-    for (auto& it : tst) {
-        double x = get<0>(it.second);
-        get<1>(it.second) = x / count;
-        get<2>(it.second) = x / count * 100;
-    }
-
-    for (auto& it : tst) {
-        res.insert({ { get<0>(it.second), get<1>(it.second), get<2>(it.second) }, it.first });
-    }
-
-    for (auto& it : res) {
-        out << it.second << ',' << get<1>(it.first) << ',' << get<2>(it.first) << '%' << endl;
-    }
-    in.close();
-    out.close();
-    return 0;
 }
