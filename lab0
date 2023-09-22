@@ -1,0 +1,108 @@
+#include <algorithm>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <map>
+#include <tuple>
+#include <sstream>
+#include <cmath>
+#include <vector>
+#include <cstdio>
+
+using namespace std;
+
+int i = 0;
+
+char* getCmdOption(char** begin, char** end, const string& option) {
+    char** itr = find(begin, end, option);
+    if (itr != end && itr + 1 != end) {
+        return *itr;
+    }
+    return 0;
+}
+
+bool cmdOptionExists(char** begin, char** end, const string& option) {
+    return find(begin, end, option) != end;
+}
+
+//string words(string str){
+//    char[100] word;
+//    string word;
+//    int j = 0;
+//    while((str[i] >= 'A' && str[i] <= 'Z') || (str[i] <= 'z' && str[i] >= 'a') ||
+//    (str[i] >= '0' && str[i] <= '9') || (str[i] >= 'А' && str[i] <= 'Я') || (str[i] >= 'а' && str[i] <= 'я') ){
+//       word[j] += str[i];
+//       i++;
+//       j++;
+//    }
+//    memcpy(w, word*, j)
+//    return w;
+//}
+
+int main(int argc, char* argv[]) {
+    if (!cmdOptionExists(argv, argv + argc, "input.txt")) {
+        std::cout << "Error, no input file provided";
+        exit(13);
+    }
+    if (!cmdOptionExists(argv, argv + argc, "output.csv")) {
+        std::cout << "Error, no output file provided";
+        exit(13);
+    }
+
+    char* input = getCmdOption(argv, argv + argc, "input.txt");
+
+    char* output = getCmdOption(argv + 1, argv + argc + 1, "output.csv");
+    ifstream in;
+    ofstream out;
+    in.open(input);
+    out.open(output);
+    int count = 0;
+    int counter = 0;
+    string str;
+    //    cout << locale().name();
+    //    std::locale loc("ru-RU");
+    //    std::locale loc("en_US");
+    //    list<string> str;
+    std::map<string, std::tuple<int, double, double>> tst;
+    while (!in.eof()) {
+        getline(in, str);
+        std::stringstream ss{ str };
+        std::string word;
+        while (ss >> word) {
+            vector <char> new_word;
+            for (auto l : word) {
+                if (isalpha(l) || isdigit(l) || l <= 'Я' && l >= 'А' || l <= 'я' && l >= 'а') {
+                    new_word.push_back(l);
+                }
+            }
+            string new_str(new_word.begin(), new_word.end());
+            if (std::get<0>(tst[new_str])) {
+                std::get<0>(tst[new_str])++;
+            }
+            else {
+                tst[new_str] = std::tuple<int, double, double>(1, 0, 0);
+            }
+            count++;
+        }
+
+    }
+
+    multimap<tuple<int, double, double>, string> res;
+
+    for (auto& it : tst) {
+        double x = get<0>(it.second);
+        get<1>(it.second) = x / count;
+        get<2>(it.second) = x / count * 100;
+    }
+
+    for (auto& it : tst) {
+        res.insert({ { get<0>(it.second), get<1>(it.second), get<2>(it.second) }, it.first });
+    }
+
+    for (auto& it : res) {
+        out << it.second << ',' << get<1>(it.first) << ',' << get<2>(it.first) << '%' << endl;
+    }
+    in.close();
+    out.close();
+    return 0;
+}
