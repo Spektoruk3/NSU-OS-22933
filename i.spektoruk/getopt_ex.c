@@ -1,81 +1,137 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include <limits.h>
-#include <sys/resource.h>
-#include <ulimit.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
+#include <sys/resource.h>
 
-extern char* optarg;
-extern char** environ;
-
-void parse_commands(int argc, char *argv[], const char options[]) {
-	char c = getopt(argc, argv, options);
-	char* actual_optarg = optarg;
-	struct rlimit rlim;
-	if (c != EOF) {
-		parse_commands(argc, argv, options);
-                switch(c) {
-                	case 'i':
-                        	printf("uid=%u, euid=%u, gid=%u, egid=%u\n", getuid(), geteuid(), getgid(), getegid());
-                        	break;
-                	case 's':
-                        	setpgid(getpid(), getpgid(getpid()));
-                        	break;
-                	case 'p':
-                        	printf("pid=%d, ppid=%d, pgrp=%d\n", getpid(), getppid(), getpgrp());
-                        	break;
-                	case 'u':
-                        	printf("max file size ulimit=%ld\n", ulimit(UL_GETFSIZE));
- 	                	break;
-        	        case 'U': 
-			{
-                	        long new_ulimit = atol(actual_optarg);
-	                        ulimit(UL_SETFSIZE, new_ulimit);
-			}
-        	                break;
-	                case 'c':
-        	                getrlimit(RLIMIT_CORE, &rlim);
-	                        printf("core-file size: %d\n", rlim.rlim_cur);
-	                        break;
-        	        case 'C':
-                	        getrlimit(RLIMIT_CORE, &rlim);
-	                        rlim.rlim_cur = atol(actual_optarg);
-        	                setrlimit(RLIMIT_CORE, &rlim);
-                	        break;
-	                case 'd':
-        	        {
-	                        char cwd[PATH_MAX];
-        	                if (NULL != getcwd(cwd, sizeof(cwd))) {
-                	                printf("working dir: %s\n", cwd);
-	                        } else {
-        	                        perror("getcwd");
-                	                exit(1);
-	                        }
-        	        }
-	                        break;
-        	        case 'v':
-                	        while (NULL != *environ) {
-                        	        printf("%s\n", *environ);
-	                                ++environ;
-        	                }
-                	        break;
-	                case 'V':
-        	                putenv(actual_optarg);
-                	        break;
-	                case '?':
-        	                printf("invalid option is %c\n", optopt); 	
-                       		break;
-	                case ':':
-        	                printf("option %c without args\n", optopt);
-                	        break;
-		}
-        }
-}
+extern char **environ;
 
 int main(int argc, char *argv[]) {
-	const char options[] = ":ispuU:cC:dvV:";
-	parse_commands(argc, argv, options);
+    char options[] = ":ispuU:cC:dvV:";  /* valid options */
+    int c;
 
-	return 0;
+    while ((c = getopt(argc, argv, options)) != EOF) {
+        switch (c) {
+            case 'i': {
+                printf("uid: %d, euid: %d, gid: %d, egid: %d\n",
+                       getuid(), geteuid(), getgid(), getegid());
+                break;
+            }
+
+            case 's': {
+                if (-1 == setpgid(0, 0)) {
+                    perror("failed to set the group leader process\n");
+                } else {
+                    printf("the group leader process has been set successfully\n");
+                }
+                break;
+            }
+
+            case 'p': {
+                printf("pid: %d, ppid: %d, pgrp: %d\n",
+                       getpid(), getppid(), getpgrp());
+                break;
+            }
+
+            case 'u': {
+                struct rlimit rlp;
+                if (-1 == getrlimit(RLIMIT_FSIZE, &rlp)) {
+                    perror("failed to get ulimit\n");
+                } else {
+                    printf("ulimit value: %llu\n", rlp.rlim_max);
+                }
+                break;
+            }
+
+            case 'U': {
+                long new_ulimit = strtol(optarg, NULL, 10);
+
+                if (0 == new_ulimit) {
+                    perror("invalid argument for the -U option\n");
+                    break;
+                }
+
+                struct rlimit rlp;
+                if (-1 == getrlimit(RLIMIT_FSIZE, &rlp)) {
+                    perror("failed to get the ulimit value\n");
+                    break;
+                }
+                rlp.rlim_cur = new_ulimit;
+                if (-1 == setrlimit(RLIMIT_FSIZE, &rlp)) {
+                    perror("failed to set the ulimit value\n");
+                } else {
+                    printf("the ulimit value has been set successfully\n");
+                }
+                break;
+            }
+
+            case 'c': {
+                struct rlimit rlp;
+                if (-1 == getrlimit(RLIMIT_CORE, &rlp)) {
+                    perror("failed to get the core-file cap limit\n");
+                } else {
+                    printf("core-file cap limit: %llu\n", rlp.rlim_max);
+                }
+                break;
+            }
+
+            case 'C': {
+                long long new_rlim = strtoll(optarg, NULL, 10);
+
+                if (0 == new_rlim) {
+                    perror("invalid argument for the -C option\n");
+                    break;
+                }
+
+                struct rlimit rlp;
+                if (-1 == getrlimit(RLIMIT_CORE, &rlp)) {
+                    perror("failed to get the core-file cap limit\n");
+                    break;
+                }
+                rlp.rlim_cur = new_rlim;
+                if (-1 == setrlimit(RLIMIT_CORE, &rlp)) {
+                    perror("failed to set the core-file cap limit\n");
+                } else {
+                    printf("the core-file cap limit has been set successfully\n");
+                }
+                break;
+            }
+
+            case 'd': {
+                char *pathname = getenv("PWD");
+
+                if (NULL == pathname) {
+                    perror("failed to get the current directory\n");
+                } else {
+                    printf("current directory: %s\n", pathname);
+                }
+                break;
+            }
+
+            case 'v': {
+                char **ptr = environ;
+                for (; *ptr != NULL; ptr++) {
+                    printf("%s\n", *ptr);
+                }
+                break;
+            }
+
+            case 'V': {
+                if (-1 == putenv(optarg)) {
+                    printf("failed to set the environmental variable");
+                }
+                break;
+            }
+
+            case ':': {
+                printf("missing argument for option: %c\n", optopt);
+                break;
+            }
+
+            case '?':
+            default:
+                printf("invalid option: %c\n", optopt);
+        }
+    }
+
+    return 0;
 }
