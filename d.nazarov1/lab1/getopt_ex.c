@@ -10,7 +10,7 @@
 extern char** environ;
 
 int main(int argc, char *argv[]){
-    char options[ ] = "f:dg:";  /* valid options */
+    char options[ ] = "ispuU:cC:dvV:f:dg:";  /* valid options */
     int c, invalid = 0, dflg = 0, fflg = 0, gflg = 0;
     extern int optind, optopt;
     extern char *optarg;
@@ -32,14 +32,14 @@ int main(int argc, char *argv[]){
                 setpgid(0, getgid());
                 printf("The process became a leader of the group\n");
                 break;
-                case 'p':
+            case 'p':
                 printf("Process id: %d\n", getpid());
                 printf("Parent-process id: %d\n", getppid());
                 printf("Group of processes id: %d\n", getpgid(0));
                 break;
 
             case 'u':
-                printf("ulimit: %ld\n", ulimit(UL_GETFSIZE));
+                printf("ulimit = %ld\n",ulimit(UL_GETFSIZE,0));
                 break;
 
             case 'U':
