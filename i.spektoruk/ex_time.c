@@ -6,12 +6,14 @@ extern char *tzname[];
 
 main()
 {
+    putenv("TZ=America/California");
     time_t now;
-    setenv("TZ", "AMERICA/LOS_ANGELES", 1);
-    tzset();
     struct tm *sp;
+
     (void) time( &now );
+
     printf("%s", ctime( &now ) );
+
     sp = localtime(&now);
     printf("%d/%d/%02d %d:%02d %s\n",
         sp->tm_mon + 1, sp->tm_mday,
