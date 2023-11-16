@@ -1,23 +1,39 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-extern char *tzname[];
 
-main()
+extern char* tzname[];
+
+int main()
 {
-    putenv("TZ=America/California");
     time_t now;
-    struct tm *sp;
+    struct tm* sp;
 
-    (void) time( &now );
+    tzset();
+    if (time(&now) == -1) {
+        perror("Program crashed. Time error: ");
+        exit(2);
+    }
 
-    printf("%s", ctime( &now ) );
+    if (ctime(&now) == NULL) {
+        perror("Program crashed. Ctime error: ");
+        exit(3);
+    } else printf("%s", ctime(&now));
 
     sp = localtime(&now);
-    printf("%d/%d/%02d %d:%02d %s\n",
-        sp->tm_mon + 1, sp->tm_mday,
-        sp->tm_year, sp->tm_hour,
-        sp->tm_min, tzname[sp->tm_isdst]);
+
+    if (sp == NULL) {
+        perror("Program crashed. Sp error: ");
+        exit(4);
+    }
+    else {
+        printf("%d/%d/%02d %d:%02d %s\n",
+            sp->tm_mon + 1, sp->tm_mday,
+            sp->tm_year - 100, sp->tm_hour,
+            sp->tm_min, tzname[sp->tm_isdst]);
+    }
+    
     exit(0);
 }
