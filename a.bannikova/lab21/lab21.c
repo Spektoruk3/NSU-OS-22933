@@ -19,5 +19,8 @@ int main() {
     signal(SIGINT, &handleSIGINT);
     signal(SIGQUIT, &handleSIGQUIT);
 
-    while (1);
+    char x;
+    while (1)
+        scanf("%c", &x);
+    return 0;
 }
