@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <strings.h>
 
-char* socket_path = "\0hidden";
+char* socket_path = "./socket31";
 
 int main() {    
     char buf[100];

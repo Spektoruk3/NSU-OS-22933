@@ -9,3 +9,4 @@ server: server.c
 clear:
 	rm client 
 	rm server
+	rm socket31
