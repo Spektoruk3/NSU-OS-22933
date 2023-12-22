@@ -11,21 +11,21 @@
 
 #define SOCKFILE_NAME "./30.socket"
 
-void myexit(const char *msg, int sd) {
+void myexit(const char *msg, int sd) { //обработка ошибок и завершение программы
     perror(msg);
-    unlink(SOCKFILE_NAME);
+    unlink(SOCKFILE_NAME); //Удаляет файл сокета
     close(sd);
-    exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);  
 }
 
-struct sockaddr_un buildsockname() {
+struct sockaddr_un buildsockname() { //создает структуру sockaddr_un, которая содержит информацию о домене сокета и пути к файлу сокета
     struct sockaddr_un sockname;
     sockname.sun_family = PF_UNIX;
     strcpy(sockname.sun_path, SOCKFILE_NAME);
     return sockname;
 }
 
-int sockcreate() {
+int sockcreate() { //создает сокет
     errno = 0;
     int sd = socket(PF_UNIX, SOCK_STREAM, 0);
     if(sd == -1) {
@@ -34,23 +34,23 @@ int sockcreate() {
     return sd;
 }
 
-void sockconnect(int sd) {
+void sockconnect(int sd) {  //устанавливает соединение с сервером
     struct sockaddr_un sockname = buildsockname();
 
     errno = 0;
-    if(connect(sd, (struct sockaddr *)&sockname, sizeof(sockname)) == -1) {
+    if(connect(sd, (struct sockaddr *)&sockname, sizeof( )) == -1) {
         myexit("connection failed", sd);
     }
 }
 
-void sockwritemsg(int sd, char *msg) {
+void sockwritemsg(int sd, char *msg) { //отправляет сообщение по сокету
     errno = 0;
     if(write(sd, msg, strlen(msg) + 1) == -1) {
         myexit("writing failed", sd);
     }
 }
 
-void sockbind(int sd) {
+void sockbind(int sd) { //привязывает сокет к адресу
     struct sockaddr_un sockname = buildsockname();
 
     errno = 0;
@@ -59,14 +59,14 @@ void sockbind(int sd) {
     }
 }
 
-void socklisten(int sd) {
+void socklisten(int sd) { //начинает прослушивание сокета
     errno = 0;
     if(listen(sd, 1) == -1) {
         myexit("listen failed", sd);
     }
 }
 
-int sockaccept(int sd) {
+int sockaccept(int sd) { //принимает входящее соединение
     errno = 0;
     int clientsd = accept(sd, NULL, NULL);
     if(clientsd == -1) {
@@ -75,7 +75,7 @@ int sockaccept(int sd) {
     return clientsd;
 }
 
-void msguppercase(int sd) {
+void msguppercase(int sd) { //преобразует принятое сообщение в верхний регистр
     char buff[255];
     errno = 0;
     while(read(sd, buff, 255) != 0) {
@@ -88,7 +88,7 @@ void msguppercase(int sd) {
     }
 }
 
-void intclose(int sig) {
+void intclose(int sig) { //удаление файла сокета
     unlink(SOCKFILE_NAME);
 }
 
@@ -96,16 +96,16 @@ int main(int argc, char *argv[]) {
 
     //--------------------------Client-----------------------------
     if(argc > 1 && !strcmp(argv[1], "client")) {
-        int clientsd = sockcreate();
+        int clientsd = sockcreate(); //Создает сокет
         printf("Socket is created\n");
 
-        sockconnect(clientsd);
+        sockconnect(clientsd); //Устанавливает соединение с сервером
         printf("Connected to a server\nPrint the message:\n");
 
         char msg[256] = "Default message";
         gets(msg);
 
-        sockwritemsg(clientsd, msg);
+        sockwritemsg(clientsd, msg); //Читает сообщение с клавиатуры и отправляет его на сервер
         printf("Message \"%s\" is sent\n", msg);
 
         close(clientsd);
@@ -118,20 +118,20 @@ int main(int argc, char *argv[]) {
         int sockdes = sockcreate();
         printf("Socket is created\n");
 
-        sockbind(sockdes);
+        sockbind(sockdes); //Привязывает сокет к адресу
         printf("Socket is bound\n");
 
-        signal(SIGINT, intclose);
+        signal(SIGINT, intclose); //Устанавливает обработчик сигнала SIGINT, чтобы можно было корректно завершить программу
 
-        socklisten(sockdes);
+        socklisten(sockdes); //Переводит сокет в режим прослушивания, ожидая входящих соединений
         printf("Program is listening for a socket. Waiting for connections...\n");
 
-        int clientsd = sockaccept(sockdes);
+        int clientsd = sockaccept(sockdes); //Принимает входящее соединение от слушающего сокета и возвращает дескриптор принимающего сокета
         printf("Got a connection\n");
 
-        msguppercase(clientsd);
+        msguppercase(clientsd); //Выполняет операцию преобразования регистра сообщения, переданного через принимающий сокет
 
-        unlink(SOCKFILE_NAME);
+        unlink(SOCKFILE_NAME); //Удаляет файл сокета
         printf("30.socket is removed\n");
 
         close(clientsd);
