@@ -1,64 +1,39 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <string.h>
 
-#define SERVER_SOCK_FILE "server.sock"
-#define MSGSIZE 20
-
-int fd = -1;
-
-void pipe_sig_handler();
-void int_sig_handler();
+#define SOCKET_PATH "/tmp/uppercase_socket"
 
 int main() {
-	struct sockaddr_un addr;
-	char msgout[MSGSIZE];
-    signal(SIGPIPE, pipe_sig_handler);
-    signal(SIGINT, int_sig_handler);
+    int client_fd;
+    struct sockaddr_un server_addr;
 
-    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-		perror("Cannot create socket");
-		exit(EXIT_FAILURE);
-	}
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strcpy(addr.sun_path, SERVER_SOCK_FILE);
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
-        perror("Connection failure");
+    // Create socket
+    client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (client_fd == -1) {
+        perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    int red = 0;
-    while (1) {
-        red = read(0, msgout, MSGSIZE);
-        size_t to_send = red < MSGSIZE ? red : MSGSIZE;
-        write(fd, msgout, to_send);
-    };
-    
-    close(fd);
-	exit(EXIT_SUCCESS);
-}
+    // Set up server address structure
+    server_addr.sun_family = AF_UNIX;
+    strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
-void pipe_sig_handler() {
-    if (fd != -1) {
-        close(fd);
-        write(2, "Writing to the socket failure\n", 31);
+    // Connect to the server
+    if (connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        perror("connect");
+        exit(EXIT_FAILURE);
     }
 
-    exit(EXIT_FAILURE);
-}
+    // Send data to the server
+    char message[] = "Hello, server!";
+    send(client_fd, message, sizeof(message), 0);
 
-void int_sig_handler() {
-    if (fd != -1) {
-        close(fd);
-    }
-    write(1, "\nTranslation finished\n", 22);
-    
-    exit(EXIT_SUCCESS);
+    // Close the socket
+    close(client_fd);
+
+    return 0;
 }
